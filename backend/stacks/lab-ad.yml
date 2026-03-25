@@ -82,7 +82,8 @@ vms:
 default_vars:
   domain_name: lab.local
   domain_netbios: LAB
-  safe_mode_password: "P@ssw0rd!Lab2025"
+  # Mot de passe défini via LAB_AD_SAFE_MODE_PASSWORD dans .env
+  safe_mode_password: "{{ lab_ad_safe_mode_password | default('Change-Me-Now!') }}"
   ca_common_name: "LAB-CA01-CA"
   dhcp_scope_start: "10.0.1.100"
   dhcp_scope_end: "10.0.1.200"

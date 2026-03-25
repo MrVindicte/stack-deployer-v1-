@@ -48,6 +48,7 @@ vms:
     depends_on: []
 
 default_vars:
-  grafana_admin_password: "change-me"
+  # Mot de passe défini via GRAFANA_ADMIN_PASSWORD dans .env
+  grafana_admin_password: "{{ grafana_admin_password | default('change-me') }}"
   prometheus_retention: "30d"
   alertmanager_smtp_host: ""

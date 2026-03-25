@@ -69,5 +69,6 @@ vms:
 default_vars:
   app_runtime: php-fpm
   php_version: "8.3"
-  mariadb_root_password: "change-me"
+  # Mot de passe défini via MARIADB_ROOT_PASSWORD dans .env
+  mariadb_root_password: "{{ mariadb_root_password | default('change-me') }}"
   domain: "app.lab.local"

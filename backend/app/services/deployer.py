@@ -315,6 +315,20 @@ def deploy_stack_task(self, deployment_id: str):
                 phase="configuring",
             )
 
+            # Build secrets from env — only inject non-empty values so
+            # stacks that don't need them are not polluted
+            _env_secrets = {
+                k: v for k, v in {
+                    "lab_ad_safe_mode_password": settings.lab_ad_safe_mode_password,
+                    "grafana_admin_password": settings.grafana_admin_password,
+                    "jenkins_admin_password": settings.jenkins_admin_password,
+                    "mariadb_root_password": settings.mariadb_root_password,
+                    "sonarqube_db_password": settings.sonarqube_db_password,
+                    "gitea_admin_password": settings.gitea_admin_password,
+                    "minio_root_password": settings.minio_root_password,
+                }.items() if v
+            }
+
             result = ansible_service.run_roles(
                 host_ip=vm_record.ip_address,
                 roles=vm_record.roles,
@@ -326,6 +340,7 @@ def deploy_stack_task(self, deployment_id: str):
                         "domain", "lab.local"
                     ),
                     **stack_data.get("default_vars", {}),
+                    **_env_secrets,  # env vars override stack defaults
                 },
             )
 

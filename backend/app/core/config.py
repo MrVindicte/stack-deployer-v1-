@@ -57,6 +57,15 @@ class Settings(BaseSettings):
     vm_ip_retry_count: int = 15
     vm_ip_retry_interval: int = 20
 
+    # Stack-specific secrets (injected as Ansible extra_vars)
+    lab_ad_safe_mode_password: str = ""
+    grafana_admin_password: str = ""
+    jenkins_admin_password: str = ""
+    mariadb_root_password: str = ""
+    sonarqube_db_password: str = ""
+    gitea_admin_password: str = ""
+    minio_root_password: str = ""
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @property

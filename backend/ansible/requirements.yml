@@ -1,0 +1,23 @@
+---
+# Ansible Galaxy collections required by Stack Deployer roles
+# Install with: ansible-galaxy collection install -r ansible/requirements.yml
+
+collections:
+  # Docker management (used by: thehive, misp, cortex, shuffle, loki,
+  #   uptime-kuma, gitea, jenkins, sonarqube, docker-registry, minio,
+  #   alertmanager)
+  - name: community.docker
+    version: ">=3.10.0"
+
+  # Windows support (used by: ad-ds, ad-cs, dhcp, dns, domain-join,
+  #   file-server, iis, wazuh-agent-win)
+  - name: ansible.windows
+    version: ">=2.5.0"
+
+  # General utilities (sysctl, apt_key, etc.)
+  - name: community.general
+    version: ">=9.0.0"
+
+  # Linux system management (systemd, firewalld, etc.)
+  - name: ansible.posix
+    version: ">=1.5.0"

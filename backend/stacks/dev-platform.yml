@@ -69,4 +69,5 @@ vms:
 
 default_vars:
   gitea_domain: "git.lab.local"
-  jenkins_admin_password: "change-me"
+  # Mot de passe défini via JENKINS_ADMIN_PASSWORD dans .env
+  jenkins_admin_password: "{{ jenkins_admin_password | default('change-me') }}"
