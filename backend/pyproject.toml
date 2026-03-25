@@ -1,0 +1,6 @@
+[tool.ruff]
+exclude = [
+    "alembic/",
+    ".venv",
+    "__pycache__",
+]
