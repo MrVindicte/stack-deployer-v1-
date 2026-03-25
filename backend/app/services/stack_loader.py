@@ -1,6 +1,5 @@
 """Stack loader — reads YAML stack definitions from disk."""
 
-import os
 from pathlib import Path
 from typing import Optional
 

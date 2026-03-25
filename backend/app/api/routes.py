@@ -1,6 +1,6 @@
 """API route definitions."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,11 +10,10 @@ from app.core.database import get_db
 from app.core.security import (
     create_access_token,
     get_current_user,
-    hash_password,
     require_admin,
     verify_password,
 )
-from app.models.models import Deployment, DeployedVM, DeploymentLog, StackDefinition, User
+from app.models.models import Deployment, DeploymentLog, StackDefinition, User
 from app.schemas.schemas import (
     DeploymentDetailOut,
     DeploymentOut,
