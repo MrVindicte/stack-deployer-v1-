@@ -1,15 +1,13 @@
-"""Alembic environment — supports both sync (migrations) and async (app) engines."""
+"""Alembic environment — sync migrations for Stack Deployer."""
 
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from alembic import context
-
-# Import app models so Alembic can detect schema changes
 from app.core.config import get_settings
 from app.core.database import Base
-import app.models.models  # noqa: F401 — ensures all models are registered
+import app.models.models  # noqa: F401
 
 config = context.config
 settings = get_settings()
@@ -19,7 +17,6 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# Override sqlalchemy.url from app settings (strips async driver for migrations)
 _sync_url = settings.database_url
 for _prefix, _replacement in (
     ("+aiosqlite", ""),
@@ -31,7 +28,7 @@ config.set_main_option("sqlalchemy.url", _sync_url)
 
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode."""
+    """Run migrations in offline mode."""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -45,7 +42,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
+    """Run migrations in online mode."""
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
