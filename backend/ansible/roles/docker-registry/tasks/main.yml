@@ -1,0 +1,25 @@
+---
+- name: Install Docker
+  apt:
+    name: [docker.io]
+    state: present
+    update_cache: true
+
+- name: Create registry data directory
+  file:
+    path: "{{ registry_data_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Deploy Docker Registry
+  community.docker.docker_container:
+    name: docker-registry
+    image: "{{ registry_docker_image }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "{{ registry_port }}:5000"
+    volumes:
+      - "{{ registry_data_dir }}:/var/lib/registry"
+    env:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"

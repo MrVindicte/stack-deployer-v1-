@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     secret_key: str = "change-me"
     debug: bool = True
+    allowed_origins: str = "http://localhost:5173,http://localhost:3000"
 
     # Database
     database_url: str = "sqlite+aiosqlite:///./stack_deployer.db"
@@ -35,6 +36,9 @@ class Settings(BaseSettings):
     ansible_roles_path: str = "./ansible/roles"
     ansible_inventory_path: str = "./ansible/inventories"
     ansible_private_key: str = "~/.ssh/id_ed25519"
+    ansible_user: str = "root"
+    ansible_winrm_user: str = "Administrator"
+    ansible_winrm_password: str = ""
 
     # Auth
     jwt_algorithm: str = "HS256"
@@ -48,7 +52,16 @@ class Settings(BaseSettings):
     default_gateway: str = "192.168.1.1"
     default_subnet_mask: int = 24
 
+    # Deployment tuning
+    vm_boot_wait_seconds: int = 120
+    vm_ip_retry_count: int = 15
+    vm_ip_retry_interval: int = 20
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
 
 
 @lru_cache

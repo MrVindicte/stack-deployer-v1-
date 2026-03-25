@@ -1,0 +1,44 @@
+---
+- name: Install dependencies
+  apt:
+    name: [docker.io, docker-compose-plugin, python3-pip]
+    state: present
+    update_cache: true
+
+- name: Create TheHive data directory
+  file:
+    path: "{{ thehive_data_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Deploy TheHive + Cassandra via Docker Compose
+  copy:
+    dest: /opt/thehive/docker-compose.yml
+    content: |
+      version: "3.8"
+      services:
+        cassandra:
+          image: {{ cassandra_docker_image }}
+          environment:
+            CASSANDRA_CLUSTER_NAME: thehive
+          volumes:
+            - cassandra_data:/var/lib/cassandra
+          restart: unless-stopped
+        thehive:
+          image: {{ thehive_docker_image }}
+          depends_on: [cassandra]
+          ports:
+            - "{{ thehive_port }}:9000"
+          environment:
+            TH_DATABASE_PROVIDER: cassandra
+            TH_DATABASE_CASSANDRA_HOSTNAMES: cassandra
+          volumes:
+            - {{ thehive_data_dir }}:/data/files
+          restart: unless-stopped
+      volumes:
+        cassandra_data:
+
+- name: Start TheHive
+  community.docker.docker_compose_v2:
+    project_src: /opt/thehive
+    state: present

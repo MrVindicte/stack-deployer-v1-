@@ -1,0 +1,7 @@
+---
+jenkins_port: 8080
+jenkins_agent_port: 50000
+jenkins_data_dir: /opt/jenkins/data
+jenkins_docker_image: "jenkins/jenkins:lts-jdk21"
+jenkins_admin_user: admin
+jenkins_admin_password: "change-me"

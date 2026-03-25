@@ -1,0 +1,96 @@
+---
+- name: Install dependencies
+  apt:
+    name: [docker.io, docker-compose-plugin]
+    state: present
+    update_cache: true
+
+- name: Create Loki directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0777"
+  loop:
+    - "{{ loki_data_dir }}"
+    - /etc/loki
+    - /etc/promtail
+
+- name: Deploy Loki config
+  copy:
+    dest: /etc/loki/loki-config.yml
+    content: |
+      auth_enabled: false
+      server:
+        http_listen_port: {{ loki_port }}
+      common:
+        path_prefix: /loki
+        storage:
+          filesystem:
+            chunks_directory: /loki/chunks
+            rules_directory: /loki/rules
+        replication_factor: 1
+        ring:
+          instance_addr: 127.0.0.1
+          kvstore:
+            store: inmemory
+      schema_config:
+        configs:
+          - from: 2020-10-24
+            store: boltdb-shipper
+            object_store: filesystem
+            schema: v11
+            index:
+              prefix: index_
+              period: 24h
+      limits_config:
+        retention_period: {{ loki_retention_period }}
+      compactor:
+        retention_enabled: true
+
+- name: Deploy Promtail config
+  copy:
+    dest: /etc/promtail/promtail-config.yml
+    content: |
+      server:
+        http_listen_port: {{ promtail_port }}
+        grpc_listen_port: 0
+      positions:
+        filename: /tmp/positions.yaml
+      clients:
+        - url: http://loki:{{ loki_port }}/loki/api/v1/push
+      scrape_configs:
+        - job_name: system
+          static_configs:
+            - targets: [localhost]
+              labels:
+                job: varlogs
+                host: "{{ inventory_hostname }}"
+                __path__: /var/log/*log
+
+- name: Deploy Loki + Promtail via Docker Compose
+  copy:
+    dest: /opt/loki/docker-compose.yml
+    content: |
+      version: "3.8"
+      services:
+        loki:
+          image: grafana/loki:{{ loki_version }}
+          ports:
+            - "{{ loki_port }}:3100"
+          volumes:
+            - /etc/loki:/etc/loki:ro
+            - {{ loki_data_dir }}:/loki
+          command: -config.file=/etc/loki/loki-config.yml
+          restart: unless-stopped
+        promtail:
+          image: grafana/promtail:{{ loki_version }}
+          volumes:
+            - /var/log:/var/log:ro
+            - /etc/promtail:/etc/promtail:ro
+          command: -config.file=/etc/promtail/promtail-config.yml
+          restart: unless-stopped
+
+- name: Start Loki
+  community.docker.docker_compose_v2:
+    project_src: /opt/loki
+    state: present

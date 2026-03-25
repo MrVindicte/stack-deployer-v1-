@@ -1,0 +1,54 @@
+---
+- name: Install dependencies
+  apt:
+    name: [docker.io, docker-compose-plugin, git]
+    state: present
+    update_cache: true
+
+- name: Create Gitea data directory
+  file:
+    path: "{{ gitea_data_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Deploy Gitea via Docker Compose
+  copy:
+    dest: /opt/gitea/docker-compose.yml
+    content: |
+      version: "3.8"
+      services:
+        gitea:
+          image: gitea/gitea:{{ gitea_version }}
+          environment:
+            USER_UID: 1000
+            USER_GID: 1000
+            GITEA__database__DB_TYPE: {{ gitea_db_type }}
+            GITEA__server__DOMAIN: {{ gitea_domain }}
+            GITEA__server__HTTP_PORT: {{ gitea_port }}
+            GITEA__server__SSH_PORT: {{ gitea_ssh_port }}
+          ports:
+            - "{{ gitea_port }}:{{ gitea_port }}"
+            - "{{ gitea_ssh_port }}:22"
+          volumes:
+            - {{ gitea_data_dir }}:/data
+          restart: unless-stopped
+
+- name: Start Gitea
+  community.docker.docker_compose_v2:
+    project_src: /opt/gitea
+    state: present
+
+- name: Wait for Gitea to be ready
+  wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ gitea_port }}"
+    timeout: 60
+
+- name: Create Gitea admin user
+  command: >
+    docker exec -it gitea gitea admin user create
+    --username {{ gitea_admin_user }}
+    --password {{ gitea_admin_password }}
+    --email {{ gitea_admin_email }}
+    --admin
+  ignore_errors: true

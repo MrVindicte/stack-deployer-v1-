@@ -21,7 +21,8 @@ services:
     volumes:
       - ./backend:/app
       - ./backend/ansible:/app/ansible
-      - ${HOME}/.ssh:/root/.ssh:ro
+      # Mount SSH keys — adjust the host path to your actual SSH directory
+      - ${SSH_KEY_DIR:-/root/.ssh}:/root/.ssh:ro
     depends_on: [redis, postgres]
     command: celery -A app.core.celery_app worker -l info -c 2
     restart: unless-stopped
@@ -45,10 +46,11 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: sd-postgres
+    env_file: ./backend/.env
     environment:
       POSTGRES_DB: stack_deployer
       POSTGRES_USER: deployer
-      POSTGRES_PASSWORD: change-me-in-production
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports: ["5432:5432"]
     volumes: [pg_data:/var/lib/postgresql/data]
     restart: unless-stopped

@@ -1,0 +1,6 @@
+---
+thehive_version: "5"
+thehive_port: 9000
+thehive_data_dir: /opt/thehive/data
+thehive_docker_image: "strangebee/thehive:{{ thehive_version }}"
+cassandra_docker_image: "cassandra:4"

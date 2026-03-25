@@ -54,11 +54,14 @@ class AnsibleService:
                             "ansible_winrm_transport": "ntlm",
                             "ansible_winrm_server_cert_validation": "ignore",
                             "ansible_port": 5986,
+                            "ansible_user": settings.ansible_winrm_user,
+                            "ansible_password": settings.ansible_winrm_password,
                         }
                         if os_type == "windows"
                         else {
                             "ansible_ssh_private_key_file": settings.ansible_private_key,
-                            "ansible_user": "root",
+                            "ansible_user": settings.ansible_user,
+                            "ansible_ssh_extra_args": "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
                         }
                     ),
                 },

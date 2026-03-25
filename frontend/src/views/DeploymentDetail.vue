@@ -21,11 +21,17 @@ onMounted(async () => {
   await store.fetchDeployment(route.params.id)
   await store.fetchLogs(route.params.id)
 
-  // Poll logs while deployment is in progress
+  const TERMINAL_STATUSES = ['running', 'partial', 'failed', 'stopped', 'destroyed']
+
+  // Poll logs while deployment is in progress; stop automatically on terminal status
   logPoll = setInterval(async () => {
     if (['provisioning', 'configuring', 'pending'].includes(store.current?.status)) {
       await store.fetchDeployment(route.params.id)
       await store.fetchLogs(route.params.id)
+    }
+    if (TERMINAL_STATUSES.includes(store.current?.status)) {
+      clearInterval(logPoll)
+      logPoll = null
     }
   }, 5000)
 })

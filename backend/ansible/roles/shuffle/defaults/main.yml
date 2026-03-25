@@ -1,0 +1,5 @@
+---
+shuffle_port: 3001
+shuffle_data_dir: /opt/shuffle
+shuffle_opensearch_port: 9200
+shuffle_docker_compose_version: "2"

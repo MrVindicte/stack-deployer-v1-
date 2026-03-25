@@ -12,9 +12,37 @@ from app.schemas.schemas import ServiceInfo, StackOut, VMTemplate
 STACKS_DIR = Path(__file__).resolve().parent.parent.parent / "stacks"
 
 
+_REQUIRED_STACK_FIELDS = ["slug", "name", "category", "services", "vms"]
+_REQUIRED_SERVICE_FIELDS = ["id", "name", "roles"]
+_REQUIRED_VM_FIELDS = ["name", "template", "roles"]
+
+
+def _validate_stack(data: dict, filename: str) -> list[str]:
+    """Return a list of validation error strings, empty if valid."""
+    errors = []
+    for field in _REQUIRED_STACK_FIELDS:
+        if field not in data:
+            errors.append(f"Missing required field: '{field}'")
+
+    for i, svc in enumerate(data.get("services", [])):
+        for field in _REQUIRED_SERVICE_FIELDS:
+            if field not in svc:
+                errors.append(f"Service[{i}] missing field: '{field}'")
+
+    for i, vm in enumerate(data.get("vms", [])):
+        for field in _REQUIRED_VM_FIELDS:
+            if field not in vm:
+                errors.append(f"VM[{i}] missing field: '{field}'")
+
+    return errors
+
+
 def _load_yaml(path: Path) -> dict:
     with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        data = yaml.safe_load(f)
+    if not isinstance(data, dict):
+        raise ValueError(f"Stack file must be a YAML mapping, got {type(data).__name__}")
+    return data
 
 
 def load_all_stacks() -> list[dict]:
@@ -28,6 +56,12 @@ def load_all_stacks() -> list[dict]:
         if entry.is_file() and entry.suffix in (".yml", ".yaml"):
             try:
                 data = _load_yaml(entry)
+                errors = _validate_stack(data, entry.name)
+                if errors:
+                    for err in errors:
+                        logger.error(f"Stack {entry.name} validation error: {err}")
+                    logger.warning(f"Skipping invalid stack: {entry.name}")
+                    continue
                 data["_file"] = str(entry)
                 stacks.append(data)
                 logger.info(f"Loaded stack: {data.get('name', entry.stem)}")

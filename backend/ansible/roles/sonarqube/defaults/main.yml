@@ -1,0 +1,5 @@
+---
+sonarqube_port: 9000
+sonarqube_data_dir: /opt/sonarqube
+sonarqube_docker_image: "sonarqube:community"
+sonarqube_db_password: "change-me"

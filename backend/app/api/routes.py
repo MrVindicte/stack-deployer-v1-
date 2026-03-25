@@ -1,6 +1,7 @@
 """API route definitions."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -175,7 +176,7 @@ async def list_deployments(
     """List all deployments for the current user."""
     result = await db.execute(
         select(Deployment)
-        .options(selectinload(Deployment.stack))
+        .options(selectinload(Deployment.stack), selectinload(Deployment.vms))
         .join(User)
         .where(User.username == current_user["username"])
         .order_by(Deployment.created_at.desc())
@@ -190,7 +191,7 @@ async def list_deployments(
             stack_name=d.stack.name if d.stack else "",
             status=d.status,
             selected_services=d.selected_services or [],
-            vm_count=0,
+            vm_count=len(d.vms) if d.vms is not None else 0,
             created_at=d.created_at,
             started_at=d.started_at,
             completed_at=d.completed_at,
@@ -280,9 +281,11 @@ async def stop_deployment(
                 proxmox_service.stop_vm(vm.proxmox_vmid)
                 vm.status = "stopped"
             except Exception as e:
+                logger.warning(f"Failed to stop VM {vm.proxmox_vmid}: {e}")
                 vm.status = "error"
 
     deployment.status = "stopped"
+    await db.commit()
     return {"status": "stopped", "message": "VMs arrêtées"}
 
 
@@ -306,10 +309,11 @@ async def destroy_deployment(
         if vm.proxmox_vmid:
             try:
                 proxmox_service.destroy_vm(vm.proxmox_vmid)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to destroy VM {vm.proxmox_vmid}: {e}")
 
     deployment.status = "destroyed"
+    await db.commit()
     return {"status": "destroyed", "message": "Déploiement détruit"}
 
 
@@ -317,19 +321,19 @@ async def destroy_deployment(
 # INFRASTRUCTURE
 # ===========================================================================
 @infra_router.get("/proxmox/status")
-async def proxmox_status(current_user: dict = Depends(get_current_user)):
-    """Get Proxmox node health status."""
+async def proxmox_status(current_user: dict = Depends(require_admin)):
+    """Get Proxmox node health status (admin only)."""
     return proxmox_service.get_node_status()
 
 
 @infra_router.get("/proxmox/templates")
-async def proxmox_templates(current_user: dict = Depends(get_current_user)):
-    """List available VM templates."""
+async def proxmox_templates(current_user: dict = Depends(require_admin)):
+    """List available VM templates (admin only)."""
     return proxmox_service.list_templates()
 
 
 @infra_router.get("/ansible/roles")
-async def ansible_roles(current_user: dict = Depends(get_current_user)):
-    """List available Ansible roles."""
+async def ansible_roles(current_user: dict = Depends(require_admin)):
+    """List available Ansible roles (admin only)."""
     from app.services.ansible_service import ansible_service
     return {"roles": ansible_service.list_available_roles()}

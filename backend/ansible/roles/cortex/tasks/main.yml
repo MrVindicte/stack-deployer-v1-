@@ -1,0 +1,46 @@
+---
+- name: Install dependencies
+  apt:
+    name: [docker.io, docker-compose-plugin]
+    state: present
+    update_cache: true
+
+- name: Create Cortex data directory
+  file:
+    path: "{{ cortex_data_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Deploy Cortex via Docker Compose
+  copy:
+    dest: /opt/cortex/docker-compose.yml
+    content: |
+      version: "3.8"
+      services:
+        elasticsearch:
+          image: docker.elastic.co/elasticsearch/elasticsearch:7.17.24
+          environment:
+            discovery.type: single-node
+            xpack.security.enabled: "false"
+            ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+          volumes:
+            - es_data:/usr/share/elasticsearch/data
+          restart: unless-stopped
+        cortex:
+          image: {{ cortex_docker_image }}
+          depends_on: [elasticsearch]
+          ports:
+            - "{{ cortex_port }}:9001"
+          environment:
+            job_directory: /tmp/cortex-jobs
+          volumes:
+            - {{ cortex_data_dir }}:/var/run/cortex
+            - /var/run/docker.sock:/var/run/docker.sock
+          restart: unless-stopped
+      volumes:
+        es_data:
+
+- name: Start Cortex
+  community.docker.docker_compose_v2:
+    project_src: /opt/cortex
+    state: present

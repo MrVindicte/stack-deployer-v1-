@@ -1,0 +1,71 @@
+---
+- name: Install common web dependencies
+  apt:
+    name: [curl, wget, unzip, software-properties-common]
+    state: present
+    update_cache: true
+
+# ── PHP-FPM ──────────────────────────────────────────────────────────────
+- name: Add PHP repository (Sury)
+  apt_repository:
+    repo: "deb https://packages.sury.org/php/ {{ ansible_distribution_release }} main"
+    state: present
+  when: app_runtime == "php-fpm"
+
+- name: Install PHP-FPM
+  apt:
+    name:
+      - "php{{ php_version }}-fpm"
+      - "php{{ php_version }}-cli"
+      - "php{{ php_version }}-common"
+      - "php{{ php_version }}-mysql"
+      - "php{{ php_version }}-pgsql"
+      - "php{{ php_version }}-mbstring"
+      - "php{{ php_version }}-xml"
+      - "php{{ php_version }}-curl"
+      - "php{{ php_version }}-zip"
+    state: present
+    update_cache: true
+  when: app_runtime == "php-fpm"
+
+- name: Start and enable PHP-FPM
+  systemd:
+    name: "php{{ php_version }}-fpm"
+    enabled: true
+    state: started
+  when: app_runtime == "php-fpm"
+
+# ── Node.js ──────────────────────────────────────────────────────────────
+- name: Add NodeSource repository
+  shell: |
+    curl -fsSL https://deb.nodesource.com/setup_{{ node_version }}.x | bash -
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+  when: app_runtime == "nodejs"
+
+- name: Install Node.js
+  apt:
+    name: [nodejs]
+    state: present
+    update_cache: true
+  when: app_runtime == "nodejs"
+
+# ── Python ───────────────────────────────────────────────────────────────
+- name: Install Python and pip
+  apt:
+    name:
+      - "python{{ python_version }}"
+      - "python{{ python_version }}-venv"
+      - "python3-pip"
+    state: present
+    update_cache: true
+  when: app_runtime == "python"
+
+# ── App directory ─────────────────────────────────────────────────────────
+- name: Create app directory
+  file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: "0755"

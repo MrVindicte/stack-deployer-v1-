@@ -1,0 +1,6 @@
+---
+loki_version: "3.0.0"
+loki_port: 3100
+loki_data_dir: /opt/loki/data
+promtail_port: 9080
+loki_retention_period: "744h"

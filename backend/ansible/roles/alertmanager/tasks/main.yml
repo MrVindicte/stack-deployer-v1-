@@ -1,0 +1,50 @@
+---
+- name: Create Alertmanager directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ alertmanager_data_dir }}"
+    - /etc/alertmanager
+
+- name: Deploy Alertmanager config
+  copy:
+    dest: /etc/alertmanager/alertmanager.yml
+    content: |
+      global:
+        resolve_timeout: 5m
+        {% if alertmanager_smtp_host %}
+        smtp_smarthost: '{{ alertmanager_smtp_host }}'
+        smtp_from: '{{ alertmanager_smtp_from }}'
+        {% endif %}
+      route:
+        group_by: ['alertname']
+        group_wait: 10s
+        group_interval: 10s
+        repeat_interval: 1h
+        receiver: 'null'
+      receivers:
+        - name: 'null'
+      inhibit_rules:
+        - source_match:
+            severity: 'critical'
+          target_match:
+            severity: 'warning'
+          equal: ['alertname']
+    mode: "0644"
+
+- name: Deploy Alertmanager via Docker
+  community.docker.docker_container:
+    name: alertmanager
+    image: "prom/alertmanager:v{{ alertmanager_version }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "{{ alertmanager_port }}:9093"
+    volumes:
+      - "/etc/alertmanager:/etc/alertmanager:ro"
+      - "{{ alertmanager_data_dir }}:/alertmanager"
+    command: >
+      --config.file=/etc/alertmanager/alertmanager.yml
+      --storage.path=/alertmanager

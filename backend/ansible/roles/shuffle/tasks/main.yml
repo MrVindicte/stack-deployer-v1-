@@ -1,0 +1,68 @@
+---
+- name: Install dependencies
+  apt:
+    name: [docker.io, docker-compose-plugin, git]
+    state: present
+    update_cache: true
+
+- name: Create Shuffle directory
+  file:
+    path: "{{ shuffle_data_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Create Shuffle subdirectories
+  file:
+    path: "{{ shuffle_data_dir }}/{{ item }}"
+    state: directory
+    mode: "0777"
+  loop: [shuffle-database, shuffle-files, shuffle-opensearch]
+
+- name: Deploy Shuffle via Docker Compose
+  copy:
+    dest: "{{ shuffle_data_dir }}/docker-compose.yml"
+    content: |
+      version: "3.8"
+      services:
+        frontend:
+          image: ghcr.io/shuffle/shuffle-frontend:latest
+          ports:
+            - "{{ shuffle_port }}:80"
+          environment:
+            BACKEND_HOSTNAME: shuffle-backend
+          restart: unless-stopped
+        backend:
+          image: ghcr.io/shuffle/shuffle-backend:latest
+          ports:
+            - "5001:5001"
+          volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+            - {{ shuffle_data_dir }}/shuffle-files:/shuffle-files
+          environment:
+            SHUFFLE_APP_HOTLOAD_FOLDER: /shuffle-files/apps
+            SHUFFLE_FILE_LOCATION: /shuffle-files
+            DATASTORE_EMULATOR_HOST: shuffle-database:8000
+            OPENSEARCH_URL: http://opensearch:{{ shuffle_opensearch_port }}
+          restart: unless-stopped
+        database:
+          image: fjogeleit/http-request-action:latest
+          image: fsouza/fake-gcs-server:latest
+          ports:
+            - "8000:8000"
+          volumes:
+            - {{ shuffle_data_dir }}/shuffle-database:/storage
+          restart: unless-stopped
+        opensearch:
+          image: opensearchproject/opensearch:2
+          environment:
+            discovery.type: single-node
+            DISABLE_SECURITY_PLUGIN: "true"
+            OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+          volumes:
+            - {{ shuffle_data_dir }}/shuffle-opensearch:/usr/share/opensearch/data
+          restart: unless-stopped
+
+- name: Start Shuffle
+  community.docker.docker_compose_v2:
+    project_src: "{{ shuffle_data_dir }}"
+    state: present

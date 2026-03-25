@@ -1,0 +1,5 @@
+---
+wazuh_manager_ip: "{{ hostvars[groups['all'][0]]['ansible_host'] | default('127.0.0.1') }}"
+wazuh_agent_version: "4.9.0"
+wazuh_agent_name: "{{ vm_name | default(inventory_hostname) }}"
+wazuh_msi_url: "https://packages.wazuh.com/4.x/windows/wazuh-agent-{{ wazuh_agent_version }}-1.msi"

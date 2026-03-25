@@ -1,0 +1,25 @@
+---
+- name: Download Wazuh agent MSI
+  ansible.windows.win_get_url:
+    url: "{{ wazuh_msi_url }}"
+    dest: "C:\\Windows\\Temp\\wazuh-agent.msi"
+
+- name: Install Wazuh agent
+  ansible.windows.win_package:
+    path: "C:\\Windows\\Temp\\wazuh-agent.msi"
+    arguments: >
+      /q
+      WAZUH_MANAGER="{{ wazuh_manager_ip }}"
+      WAZUH_AGENT_NAME="{{ wazuh_agent_name }}"
+    state: present
+
+- name: Start Wazuh agent service
+  ansible.windows.win_service:
+    name: WazuhSvc
+    state: started
+    start_mode: auto
+
+- name: Clean up installer
+  ansible.windows.win_file:
+    path: "C:\\Windows\\Temp\\wazuh-agent.msi"
+    state: absent

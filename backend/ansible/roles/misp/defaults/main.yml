@@ -1,0 +1,6 @@
+---
+misp_version: "2.4"
+misp_port: 443
+misp_base_url: "https://{{ ansible_host }}"
+misp_data_dir: /opt/misp
+misp_docker_image: "ghcr.io/misp/misp-docker/misp-core:latest"

@@ -1,0 +1,7 @@
+---
+minio_port: 9000
+minio_console_port: 9001
+minio_data_dir: /opt/minio/data
+minio_docker_image: "minio/minio:latest"
+minio_root_user: minioadmin
+minio_root_password: "change-me"

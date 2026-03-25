@@ -1,0 +1,5 @@
+---
+cortex_version: "3"
+cortex_port: 9001
+cortex_data_dir: /opt/cortex/data
+cortex_docker_image: "thehiveproject/cortex:{{ cortex_version }}"

@@ -1,0 +1,48 @@
+---
+- name: Install dependencies
+  apt:
+    name: [docker.io, docker-compose-plugin]
+    state: present
+    update_cache: true
+
+- name: Create MISP data directory
+  file:
+    path: "{{ misp_data_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Deploy MISP via Docker Compose
+  copy:
+    dest: "{{ misp_data_dir }}/docker-compose.yml"
+    content: |
+      version: "3.8"
+      services:
+        misp:
+          image: {{ misp_docker_image }}
+          ports:
+            - "443:443"
+            - "80:80"
+          environment:
+            MISP_BASEURL: {{ misp_base_url }}
+            MISP_EMAIL: admin@admin.test
+          volumes:
+            - misp_data:/var/www/MISP
+          restart: unless-stopped
+        misp-db:
+          image: mysql:8
+          environment:
+            MYSQL_DATABASE: misp
+            MYSQL_USER: misp
+            MYSQL_PASSWORD: misp
+            MYSQL_ROOT_PASSWORD: misp_root
+          volumes:
+            - misp_db:/var/lib/mysql
+          restart: unless-stopped
+      volumes:
+        misp_data:
+        misp_db:
+
+- name: Start MISP
+  community.docker.docker_compose_v2:
+    project_src: "{{ misp_data_dir }}"
+    state: present

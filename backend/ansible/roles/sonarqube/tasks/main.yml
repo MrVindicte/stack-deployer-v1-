@@ -1,0 +1,55 @@
+---
+- name: Install dependencies
+  apt:
+    name: [docker.io, docker-compose-plugin]
+    state: present
+    update_cache: true
+
+- name: Set vm.max_map_count for Elasticsearch
+  sysctl:
+    name: vm.max_map_count
+    value: "262144"
+    state: present
+    reload: true
+
+- name: Create SonarQube directories
+  file:
+    path: "{{ sonarqube_data_dir }}/{{ item }}"
+    state: directory
+    mode: "0777"
+  loop: [data, logs, extensions, postgresql]
+
+- name: Deploy SonarQube via Docker Compose
+  copy:
+    dest: "{{ sonarqube_data_dir }}/docker-compose.yml"
+    content: |
+      version: "3.8"
+      services:
+        sonarqube:
+          image: {{ sonarqube_docker_image }}
+          depends_on: [db]
+          ports:
+            - "{{ sonarqube_port }}:9000"
+          environment:
+            SONAR_JDBC_URL: jdbc:postgresql://db:5432/sonar
+            SONAR_JDBC_USERNAME: sonar
+            SONAR_JDBC_PASSWORD: {{ sonarqube_db_password }}
+          volumes:
+            - {{ sonarqube_data_dir }}/data:/opt/sonarqube/data
+            - {{ sonarqube_data_dir }}/logs:/opt/sonarqube/logs
+            - {{ sonarqube_data_dir }}/extensions:/opt/sonarqube/extensions
+          restart: unless-stopped
+        db:
+          image: postgres:15-alpine
+          environment:
+            POSTGRES_DB: sonar
+            POSTGRES_USER: sonar
+            POSTGRES_PASSWORD: {{ sonarqube_db_password }}
+          volumes:
+            - {{ sonarqube_data_dir }}/postgresql:/var/lib/postgresql/data
+          restart: unless-stopped
+
+- name: Start SonarQube
+  community.docker.docker_compose_v2:
+    project_src: "{{ sonarqube_data_dir }}"
+    state: present

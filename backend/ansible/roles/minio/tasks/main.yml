@@ -1,0 +1,28 @@
+---
+- name: Install Docker
+  apt:
+    name: [docker.io]
+    state: present
+    update_cache: true
+
+- name: Create MinIO data directory
+  file:
+    path: "{{ minio_data_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Deploy MinIO container
+  community.docker.docker_container:
+    name: minio
+    image: "{{ minio_docker_image }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "{{ minio_port }}:9000"
+      - "{{ minio_console_port }}:9001"
+    volumes:
+      - "{{ minio_data_dir }}:/data"
+    env:
+      MINIO_ROOT_USER: "{{ minio_root_user }}"
+      MINIO_ROOT_PASSWORD: "{{ minio_root_password }}"
+    command: server /data --console-address ":9001"

@@ -1,0 +1,23 @@
+---
+- name: Install Docker
+  apt:
+    name: [docker.io]
+    state: present
+    update_cache: true
+
+- name: Create Uptime Kuma data directory
+  file:
+    path: "{{ uptime_kuma_data_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Deploy Uptime Kuma container
+  community.docker.docker_container:
+    name: uptime-kuma
+    image: "{{ uptime_kuma_docker_image }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "{{ uptime_kuma_port }}:3001"
+    volumes:
+      - "{{ uptime_kuma_data_dir }}:/app/data"
