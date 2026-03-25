@@ -1,0 +1,32 @@
+---
+- name: Install PostgreSQL
+  ansible.builtin.apt:
+    name: [postgresql, postgresql-client, python3-psycopg2]
+    state: present
+    update_cache: true
+
+- name: Start and enable PostgreSQL
+  ansible.builtin.systemd:
+    name: postgresql
+    state: started
+    enabled: true
+
+- name: Configure listen addresses
+  ansible.builtin.lineinfile:
+    path: /etc/postgresql/16/main/postgresql.conf
+    regexp: "^#?listen_addresses"
+    line: "listen_addresses = '*'"
+  notify: restart postgresql
+
+- name: Allow remote connections in pg_hba
+  ansible.builtin.lineinfile:
+    path: /etc/postgresql/16/main/pg_hba.conf
+    line: "host all all 0.0.0.0/0 scram-sha-256"
+  notify: restart postgresql
+
+- name: Create application database
+  become_user: postgres
+  community.postgresql.postgresql_db:
+    name: "{{ postgresql_db_name | default('app') }}"
+    state: present
+  when: postgresql_db_name is defined

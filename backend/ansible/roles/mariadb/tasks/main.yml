@@ -1,0 +1,34 @@
+---
+- name: Install MariaDB
+  ansible.builtin.apt:
+    name: [mariadb-server, mariadb-client, python3-mysqldb]
+    state: present
+    update_cache: true
+
+- name: Start and enable MariaDB
+  ansible.builtin.systemd:
+    name: mariadb
+    state: started
+    enabled: true
+
+- name: Set root password
+  community.mysql.mysql_user:
+    name: root
+    password: "{{ mariadb_root_password }}"
+    host_all: true
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  ignore_errors: true
+
+- name: Remove anonymous users
+  community.mysql.mysql_user:
+    name: ""
+    state: absent
+    host_all: true
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- name: Create application database
+  community.mysql.mysql_db:
+    name: "{{ mariadb_db_name | default('app') }}"
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  when: mariadb_db_name is defined

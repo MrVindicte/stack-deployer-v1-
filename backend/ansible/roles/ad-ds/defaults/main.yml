@@ -1,0 +1,5 @@
+---
+domain_name: lab.local
+domain_netbios: LAB
+safe_mode_password: "P@ssw0rd!Lab2025"
+dns_forwarder: "1.1.1.1"

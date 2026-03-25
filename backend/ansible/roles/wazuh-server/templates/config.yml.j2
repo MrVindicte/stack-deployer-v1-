@@ -1,0 +1,12 @@
+nodes:
+  indexer:
+    - name: node-1
+      ip: "{{ ansible_host }}"
+
+  server:
+    - name: wazuh-1
+      ip: "{{ ansible_host }}"
+
+  dashboard:
+    - name: dashboard
+      ip: "{{ ansible_host }}"

@@ -1,0 +1,46 @@
+---
+- name: Install File Server features
+  ansible.windows.win_feature:
+    name:
+      - FS-FileServer
+      - FS-DFS-Namespace
+      - FS-Resource-Manager
+      - RSAT-File-Services
+    state: present
+    include_management_tools: true
+  register: fs_feature
+
+- name: Reboot if required
+  ansible.windows.win_reboot:
+  when: fs_feature.reboot_required
+
+- name: Create shared folders directory
+  ansible.windows.win_file:
+    path: "{{ file_server_root }}"
+    state: directory
+
+- name: Create departmental shares
+  ansible.windows.win_powershell:
+    script: |
+      $shares = @('Commun', 'IT', 'RH', 'Direction')
+      $root = '{{ file_server_root }}'
+
+      foreach ($share in $shares) {
+        $path = Join-Path $root $share
+        if (-not (Test-Path $path)) {
+          New-Item -Path $path -ItemType Directory -Force
+        }
+        $existing = Get-SmbShare -Name $share -ErrorAction SilentlyContinue
+        if (-not $existing) {
+          New-SmbShare -Name $share -Path $path -FullAccess "Domain Admins" -ChangeAccess "Authenticated Users"
+          Write-Output "Created share: $share"
+        }
+      }
+
+- name: Enable volume shadow copies
+  ansible.windows.win_powershell:
+    script: |
+      $volume = (Get-Volume | Where-Object { $_.DriveLetter -eq 'C' }).DriveLetter
+      vssadmin add shadowstorage /for=C: /on=C: /maxsize=10% 2>$null
+      vssadmin create shadow /for=C: 2>$null
+  ignore_errors: true

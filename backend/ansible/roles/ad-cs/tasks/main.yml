@@ -1,0 +1,75 @@
+---
+# Role: ad-cs — Install Active Directory Certificate Services (Enterprise CA)
+# Requires: AD DS promoted, domain joined
+
+- name: Install AD CS features
+  ansible.windows.win_feature:
+    name:
+      - ADCS-Cert-Authority
+      - ADCS-Web-Enrollment
+      - RSAT-ADCS
+      - RSAT-ADCS-Mgmt
+    state: present
+    include_management_tools: true
+  register: adcs_feature
+
+- name: Reboot if required
+  ansible.windows.win_reboot:
+    reboot_timeout: 600
+  when: adcs_feature.reboot_required
+
+- name: Check if CA is already configured
+  ansible.windows.win_powershell:
+    script: |
+      try {
+        $ca = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\CertSvc\Configuration' -ErrorAction Stop
+        $Ansible.Result = "configured"
+      } catch {
+        $Ansible.Result = "not_configured"
+      }
+  register: ca_check
+
+- name: Configure Enterprise Root CA
+  ansible.windows.win_powershell:
+    script: |
+      Install-AdcsCertificationAuthority `
+        -CAType EnterpriseRootCA `
+        -CACommonName '{{ ca_common_name }}' `
+        -KeyLength 4096 `
+        -HashAlgorithmName SHA256 `
+        -CryptoProviderName "RSA#Microsoft Software Key Storage Provider" `
+        -ValidityPeriod Years `
+        -ValidityPeriodUnits 10 `
+        -Force
+  when: ca_check.result == "not_configured"
+
+- name: Configure Web Enrollment
+  ansible.windows.win_powershell:
+    script: |
+      Install-AdcsWebEnrollment -Force
+  ignore_errors: true
+
+- name: Configure auto-enrollment GPO
+  ansible.windows.win_powershell:
+    script: |
+      # Enable certificate auto-enrollment for computers and users
+      $domain = (Get-ADDomain).DistinguishedName
+      $gpoName = "PKI Auto-Enrollment"
+
+      # Create GPO if not exists
+      $gpo = Get-GPO -Name $gpoName -ErrorAction SilentlyContinue
+      if (-not $gpo) {
+        $gpo = New-GPO -Name $gpoName
+        $gpo | New-GPLink -Target $domain -LinkEnabled Yes
+      }
+
+      # Computer auto-enrollment
+      Set-GPRegistryValue -Name $gpoName `
+        -Key "HKLM\SOFTWARE\Policies\Microsoft\Cryptography\AutoEnrollment" `
+        -ValueName "AEPolicy" -Type DWord -Value 7
+
+      # User auto-enrollment
+      Set-GPRegistryValue -Name $gpoName `
+        -Key "HKCU\SOFTWARE\Policies\Microsoft\Cryptography\AutoEnrollment" `
+        -ValueName "AEPolicy" -Type DWord -Value 7
+  when: ca_check.result == "not_configured"

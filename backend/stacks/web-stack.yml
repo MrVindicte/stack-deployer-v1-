@@ -1,0 +1,73 @@
+slug: web-stack
+name: "Web Stack"
+description: >
+  Stack de développement web complète avec reverse proxy,
+  serveur d'application, base de données et cache.
+category: linux
+icon: globe
+version: "1.0.0"
+
+services:
+  - id: nginx
+    name: "Nginx Reverse Proxy"
+    description: "Reverse proxy avec TLS termination et load balancing"
+    required: true
+    roles: [nginx-proxy]
+
+  - id: app-server
+    name: "Serveur d'application"
+    description: "PHP-FPM / Node.js / Python (configurable)"
+    required: true
+    roles: [app-server]
+
+  - id: mariadb
+    name: "MariaDB"
+    description: "Base de données relationnelle"
+    required: false
+    roles: [mariadb]
+
+  - id: postgresql
+    name: "PostgreSQL"
+    description: "Base de données relationnelle avancée"
+    required: false
+    roles: [postgresql]
+
+  - id: redis
+    name: "Redis"
+    description: "Cache en mémoire et broker de messages"
+    required: false
+    roles: [redis]
+
+  - id: minio
+    name: "MinIO"
+    description: "Stockage objet compatible S3"
+    required: false
+    roles: [minio]
+
+vms:
+  - name: WEB01
+    template: debian12-tpl
+    os_type: linux
+    roles: [nginx-proxy, app-server, redis]
+    default_specs: { cores: 2, ram: 2048, disk: 40 }
+    depends_on: []
+
+  - name: DB01
+    template: debian12-tpl
+    os_type: linux
+    roles: [mariadb, postgresql]
+    default_specs: { cores: 2, ram: 4096, disk: 80 }
+    depends_on: []
+
+  - name: STORAGE01
+    template: debian12-tpl
+    os_type: linux
+    roles: [minio]
+    default_specs: { cores: 2, ram: 2048, disk: 200 }
+    depends_on: []
+
+default_vars:
+  app_runtime: php-fpm
+  php_version: "8.3"
+  mariadb_root_password: "change-me"
+  domain: "app.lab.local"

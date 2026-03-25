@@ -1,0 +1,72 @@
+slug: dev-platform
+name: "Dev Platform"
+description: >
+  Plateforme de développement avec forge Git, CI/CD,
+  analyse de code et registre de conteneurs.
+category: linux
+icon: code
+version: "1.0.0"
+
+services:
+  - id: gitea
+    name: "Gitea"
+    description: "Forge Git légère self-hosted"
+    required: true
+    roles: [gitea]
+
+  - id: jenkins
+    name: "Jenkins"
+    description: "Serveur CI/CD avec pipelines"
+    required: false
+    roles: [jenkins]
+
+  - id: sonarqube
+    name: "SonarQube"
+    description: "Analyse statique de code et quality gates"
+    required: false
+    roles: [sonarqube]
+
+  - id: registry
+    name: "Docker Registry"
+    description: "Registre privé d'images Docker"
+    required: false
+    roles: [docker-registry]
+
+  - id: vault
+    name: "HashiCorp Vault"
+    description: "Gestion centralisée des secrets"
+    required: false
+    roles: [vault]
+
+vms:
+  - name: GIT01
+    template: debian12-tpl
+    os_type: linux
+    roles: [gitea, docker-registry]
+    default_specs: { cores: 2, ram: 2048, disk: 60 }
+    depends_on: []
+
+  - name: CI01
+    template: debian12-tpl
+    os_type: linux
+    roles: [jenkins]
+    default_specs: { cores: 4, ram: 4096, disk: 80 }
+    depends_on: []
+
+  - name: QA01
+    template: debian12-tpl
+    os_type: linux
+    roles: [sonarqube]
+    default_specs: { cores: 2, ram: 4096, disk: 40 }
+    depends_on: []
+
+  - name: VAULT01
+    template: debian12-tpl
+    os_type: linux
+    roles: [vault]
+    default_specs: { cores: 1, ram: 1024, disk: 20 }
+    depends_on: []
+
+default_vars:
+  gitea_domain: "git.lab.local"
+  jenkins_admin_password: "change-me"

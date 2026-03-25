@@ -1,0 +1,31 @@
+---
+# Role: dns — Ensure DNS Server feature is installed
+# Typically co-located with AD DS, but can stand alone.
+
+- name: Install DNS Server feature
+  ansible.windows.win_feature:
+    name: [DNS, RSAT-DNS-Server]
+    state: present
+    include_management_tools: true
+  register: dns_feature
+
+- name: Reboot if required
+  ansible.windows.win_reboot:
+  when: dns_feature.reboot_required
+
+- name: Configure DNS forwarders
+  ansible.windows.win_powershell:
+    script: |
+      $forwarders = @('{{ dns_forwarder | default("1.1.1.1") }}', '{{ dns_forwarder_secondary | default("8.8.8.8") }}')
+      Set-DnsServerForwarder -IPAddress $forwarders -PassThru
+  ignore_errors: true
+
+- name: Create reverse lookup zone
+  ansible.windows.win_powershell:
+    script: |
+      $networkId = '{{ reverse_zone_network | default("10.0.1") }}'
+      $existing = Get-DnsServerZone | Where-Object { $_.ZoneName -like "*$($networkId.Split('.')[2]).$($networkId.Split('.')[1]).$($networkId.Split('.')[0]).in-addr.arpa" }
+      if (-not $existing) {
+        Add-DnsServerPrimaryZone -NetworkId "$networkId.0/24" -ReplicationScope Domain -ErrorAction SilentlyContinue
+      }
+  ignore_errors: true

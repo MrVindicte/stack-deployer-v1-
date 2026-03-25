@@ -1,0 +1,70 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install prerequisites
+  ansible.builtin.apt:
+    name: [curl, apt-transport-https, lsb-release, gnupg2]
+    state: present
+
+- name: Download Wazuh installation assistant
+  ansible.builtin.get_url:
+    url: "https://packages.wazuh.com/{{ wazuh_version }}/wazuh-install.sh"
+    dest: /tmp/wazuh-install.sh
+    mode: "0755"
+
+- name: Download Wazuh config file
+  ansible.builtin.get_url:
+    url: "https://packages.wazuh.com/{{ wazuh_version }}/config.yml"
+    dest: /tmp/config.yml
+    mode: "0644"
+
+- name: Configure single-node deployment
+  ansible.builtin.template:
+    src: config.yml.j2
+    dest: /tmp/config.yml
+    mode: "0644"
+
+- name: Run Wazuh installer (indexer)
+  ansible.builtin.command:
+    cmd: bash /tmp/wazuh-install.sh --wazuh-indexer node-1
+    creates: /etc/wazuh-indexer
+
+- name: Initialize Wazuh indexer cluster
+  ansible.builtin.command:
+    cmd: bash /tmp/wazuh-install.sh --start-cluster
+  ignore_errors: true
+
+- name: Run Wazuh installer (server)
+  ansible.builtin.command:
+    cmd: bash /tmp/wazuh-install.sh --wazuh-server wazuh-1
+    creates: /var/ossec
+
+- name: Run Wazuh installer (dashboard)
+  ansible.builtin.command:
+    cmd: bash /tmp/wazuh-install.sh --wazuh-dashboard dashboard
+    creates: /etc/wazuh-dashboard
+
+- name: Ensure Wazuh services are running
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  loop:
+    - wazuh-indexer
+    - wazuh-manager
+    - wazuh-dashboard
+  ignore_errors: true
+
+- name: Extract Wazuh admin credentials
+  ansible.builtin.command:
+    cmd: tar -xvf /tmp/wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt -O
+  register: wazuh_creds
+  changed_when: false
+  ignore_errors: true
+
+- name: Display Wazuh dashboard URL
+  ansible.builtin.debug:
+    msg: "Wazuh Dashboard: https://{{ ansible_host }}:443 — Check passwords in /tmp/wazuh-install-files.tar"

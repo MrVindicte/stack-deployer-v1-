@@ -1,0 +1,69 @@
+---
+- name: Install IIS features
+  ansible.windows.win_feature:
+    name:
+      - Web-Server
+      - Web-Mgmt-Console
+      - Web-Scripting-Tools
+      - Web-Asp-Net45
+      - Web-ISAPI-Ext
+      - Web-ISAPI-Filter
+    state: present
+    include_management_tools: true
+  register: iis_feature
+
+- name: Reboot if required
+  ansible.windows.win_reboot:
+  when: iis_feature.reboot_required
+
+- name: Start W3SVC service
+  ansible.windows.win_service:
+    name: W3SVC
+    state: started
+    start_mode: auto
+
+- name: Create application directory
+  ansible.windows.win_file:
+    path: "{{ iis_site_path }}"
+    state: directory
+
+- name: Deploy default page
+  ansible.windows.win_copy:
+    content: |
+      <!DOCTYPE html>
+      <html>
+      <head><title>Stack Deployer - IIS</title></head>
+      <body>
+        <h1>IIS is running on {{ ansible_hostname }}</h1>
+        <p>Deployed by Stack Deployer via Ansible</p>
+        <p>Domain: {{ domain_name | default('N/A') }}</p>
+      </body>
+      </html>
+    dest: "{{ iis_site_path }}\\index.html"
+
+- name: Configure default website binding
+  ansible.windows.win_powershell:
+    script: |
+      Import-Module WebAdministration
+      Set-ItemProperty "IIS:\Sites\Default Web Site" -Name physicalPath -Value '{{ iis_site_path }}'
+  ignore_errors: true
+
+- name: Request SSL certificate from AD CS (if available)
+  ansible.windows.win_powershell:
+    script: |
+      try {
+        $template = "WebServer"
+        $cert = Get-Certificate -Template $template -DnsName "{{ ansible_hostname }}.{{ domain_name }}" -CertStoreLocation cert:\LocalMachine\My -ErrorAction Stop
+        if ($cert.Certificate) {
+          $thumbprint = $cert.Certificate.Thumbprint
+          Import-Module WebAdministration
+          New-WebBinding -Name "Default Web Site" -Protocol https -Port 443
+          $binding = Get-WebBinding -Name "Default Web Site" -Protocol https
+          $binding.AddSslCertificate($thumbprint, "My")
+          Write-Output "HTTPS binding created with cert $thumbprint"
+        }
+      } catch {
+        Write-Output "AD CS not available or template not found — skipping HTTPS"
+      }
+  ignore_errors: true
+  when: domain_name is defined

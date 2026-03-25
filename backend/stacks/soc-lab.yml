@@ -1,0 +1,105 @@
+slug: soc-lab
+name: "SOC Lab"
+description: >
+  Stack Security Operations Center avec SIEM, gestion d'incidents,
+  threat intelligence et analyse de malware. Parfait pour
+  l'entraînement blue team et la réponse à incidents.
+category: security
+icon: eye
+version: "1.0.0"
+
+services:
+  - id: wazuh
+    name: "Wazuh SIEM"
+    description: "SIEM open-source, détection d'intrusions, compliance"
+    required: true
+    roles: [wazuh-server]
+
+  - id: thehive
+    name: "TheHive"
+    description: "Plateforme de réponse à incidents collaborative"
+    required: false
+    depends_on: [wazuh]
+    roles: [thehive]
+
+  - id: misp
+    name: "MISP"
+    description: "Plateforme de partage de threat intelligence"
+    required: false
+    roles: [misp]
+
+  - id: cortex
+    name: "Cortex"
+    description: "Moteur d'analyse et de réponse automatisée"
+    required: false
+    depends_on: [thehive]
+    roles: [cortex]
+
+  - id: shuffle
+    name: "Shuffle SOAR"
+    description: "Orchestration et automatisation de la réponse (SOAR)"
+    required: false
+    depends_on: [wazuh, thehive]
+    roles: [shuffle]
+
+  - id: target-win
+    name: "Cible Windows"
+    description: "VM Windows avec agent Wazuh pour générer des alertes"
+    required: false
+    depends_on: [wazuh]
+    roles: [wazuh-agent-win]
+
+  - id: target-linux
+    name: "Cible Linux"
+    description: "VM Linux avec agent Wazuh pour générer des alertes"
+    required: false
+    depends_on: [wazuh]
+    roles: [wazuh-agent-linux]
+
+vms:
+  - name: SIEM01
+    template: debian12-tpl
+    os_type: linux
+    roles: [wazuh-server]
+    default_specs: { cores: 4, ram: 8192, disk: 100 }
+    depends_on: []
+
+  - name: IR01
+    template: debian12-tpl
+    os_type: linux
+    roles: [thehive, cortex]
+    default_specs: { cores: 2, ram: 4096, disk: 60 }
+    depends_on: [SIEM01]
+
+  - name: TI01
+    template: debian12-tpl
+    os_type: linux
+    roles: [misp]
+    default_specs: { cores: 2, ram: 4096, disk: 40 }
+    depends_on: []
+
+  - name: SOAR01
+    template: debian12-tpl
+    os_type: linux
+    roles: [shuffle]
+    default_specs: { cores: 2, ram: 4096, disk: 40 }
+    depends_on: [SIEM01]
+
+  - name: TARGET-WIN
+    template: win2022-tpl
+    os_type: windows
+    roles: [wazuh-agent-win]
+    default_specs: { cores: 2, ram: 2048, disk: 40 }
+    depends_on: [SIEM01]
+
+  - name: TARGET-LIN
+    template: debian12-tpl
+    os_type: linux
+    roles: [wazuh-agent-linux]
+    default_specs: { cores: 1, ram: 1024, disk: 20 }
+    depends_on: [SIEM01]
+
+default_vars:
+  wazuh_version: "4.9"
+  thehive_version: "5"
+  misp_version: "2.4"

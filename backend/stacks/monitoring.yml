@@ -1,0 +1,53 @@
+slug: monitoring
+name: "Stack Monitoring"
+description: >
+  Suite de monitoring complète avec métriques, logs,
+  dashboards et alerting. Supervision de toute l'infra.
+category: linux
+icon: activity
+version: "1.0.0"
+
+services:
+  - id: prometheus
+    name: "Prometheus"
+    description: "Collecte de métriques et alerting"
+    required: true
+    roles: [prometheus]
+
+  - id: grafana
+    name: "Grafana"
+    description: "Dashboards et visualisation"
+    required: true
+    roles: [grafana]
+
+  - id: loki
+    name: "Loki + Promtail"
+    description: "Agrégation de logs centralisée"
+    required: false
+    roles: [loki]
+
+  - id: alertmanager
+    name: "AlertManager"
+    description: "Gestion des alertes (email, Slack, webhook)"
+    required: false
+    depends_on: [prometheus]
+    roles: [alertmanager]
+
+  - id: uptime-kuma
+    name: "Uptime Kuma"
+    description: "Monitoring de disponibilité et status page"
+    required: false
+    roles: [uptime-kuma]
+
+vms:
+  - name: MON01
+    template: debian12-tpl
+    os_type: linux
+    roles: [prometheus, grafana, alertmanager, loki, uptime-kuma]
+    default_specs: { cores: 4, ram: 8192, disk: 120 }
+    depends_on: []
+
+default_vars:
+  grafana_admin_password: "change-me"
+  prometheus_retention: "30d"
+  alertmanager_smtp_host: ""

@@ -1,0 +1,42 @@
+---
+- name: Install DHCP feature
+  ansible.windows.win_feature:
+    name: [DHCP, RSAT-DHCP]
+    state: present
+    include_management_tools: true
+  register: dhcp_feature
+
+- name: Reboot if required
+  ansible.windows.win_reboot:
+  when: dhcp_feature.reboot_required
+
+- name: Authorize DHCP in AD
+  ansible.windows.win_powershell:
+    script: |
+      Add-DhcpServerInDC -DnsName "{{ ansible_hostname }}.{{ domain_name }}"
+  ignore_errors: true
+
+- name: Create DHCP scope
+  ansible.windows.win_powershell:
+    script: |
+      $scopeName = "Lab Network"
+      $existing = Get-DhcpServerv4Scope -ErrorAction SilentlyContinue
+      if (-not ($existing | Where-Object { $_.Name -eq $scopeName })) {
+        Add-DhcpServerv4Scope `
+          -Name $scopeName `
+          -StartRange '{{ dhcp_scope_start }}' `
+          -EndRange '{{ dhcp_scope_end }}' `
+          -SubnetMask '{{ dhcp_subnet_mask | default("255.255.255.0") }}' `
+          -State Active
+
+        Set-DhcpServerv4OptionValue `
+          -Router '{{ dhcp_gateway | default("10.0.1.1") }}' `
+          -DnsServer (Get-DnsServerSetting).ListeningIPAddress[0] `
+          -DnsDomain '{{ domain_name }}'
+      }
+
+- name: Suppress DHCP post-install config flag
+  ansible.windows.win_powershell:
+    script: |
+      Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\ServerManager\Roles\12' -Name ConfigurationState -Value 2
+  ignore_errors: true

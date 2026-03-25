@@ -1,0 +1,4 @@
+---
+dns_forwarder: "1.1.1.1"
+dns_forwarder_secondary: "8.8.8.8"
+reverse_zone_network: "10.0.1"

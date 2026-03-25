@@ -1,0 +1,5 @@
+---
+domain_name: lab.local
+dc_ip_address: "10.0.1.10"
+domain_admin_user: Administrator
+domain_admin_password: "P@ssw0rd!Lab2025"

@@ -1,0 +1,26 @@
+---
+- name: Install Redis
+  ansible.builtin.apt:
+    name: redis-server
+    state: present
+    update_cache: true
+
+- name: Bind to all interfaces
+  ansible.builtin.lineinfile:
+    path: /etc/redis/redis.conf
+    regexp: "^bind "
+    line: "bind 0.0.0.0"
+  notify: restart redis
+
+- name: Set maxmemory policy
+  ansible.builtin.lineinfile:
+    path: /etc/redis/redis.conf
+    regexp: "^#? *maxmemory-policy"
+    line: "maxmemory-policy allkeys-lru"
+  notify: restart redis
+
+- name: Start and enable Redis
+  ansible.builtin.systemd:
+    name: redis-server
+    state: started
+    enabled: true

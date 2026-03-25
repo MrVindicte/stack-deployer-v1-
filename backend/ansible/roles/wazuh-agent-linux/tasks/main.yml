@@ -1,0 +1,38 @@
+---
+- name: Install prerequisites
+  ansible.builtin.apt:
+    name: [curl, apt-transport-https, lsb-release, gnupg2]
+    state: present
+    update_cache: true
+
+- name: Add Wazuh GPG key
+  ansible.builtin.apt_key:
+    url: https://packages.wazuh.com/key/GPG-KEY-WAZUH
+    state: present
+
+- name: Add Wazuh repository
+  ansible.builtin.apt_repository:
+    repo: "deb https://packages.wazuh.com/4.x/apt/ stable main"
+    state: present
+
+- name: Install Wazuh agent
+  ansible.builtin.apt:
+    name: wazuh-agent
+    state: present
+    update_cache: true
+  environment:
+    WAZUH_MANAGER: "{{ wazuh_manager_ip }}"
+
+- name: Configure manager address
+  ansible.builtin.lineinfile:
+    path: /var/ossec/etc/ossec.conf
+    regexp: '<address>.*</address>'
+    line: "      <address>{{ wazuh_manager_ip }}</address>"
+  notify: restart wazuh-agent
+
+- name: Start and enable Wazuh agent
+  ansible.builtin.systemd:
+    name: wazuh-agent
+    state: started
+    enabled: true
+    daemon_reload: true

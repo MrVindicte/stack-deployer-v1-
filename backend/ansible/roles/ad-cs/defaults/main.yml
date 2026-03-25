@@ -1,0 +1,4 @@
+---
+ca_common_name: "LAB-CA01-CA"
+ca_validity_years: 10
+ca_key_length: 4096

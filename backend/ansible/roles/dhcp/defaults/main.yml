@@ -1,0 +1,6 @@
+---
+dhcp_scope_start: "10.0.1.100"
+dhcp_scope_end: "10.0.1.200"
+dhcp_subnet_mask: "255.255.255.0"
+dhcp_gateway: "10.0.1.1"
+domain_name: lab.local

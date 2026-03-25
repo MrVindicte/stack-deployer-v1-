@@ -1,0 +1,97 @@
+---
+# Role: ad-ds — Install and promote Active Directory Domain Services
+# Target: Windows Server 2022
+# Connection: WinRM
+
+- name: Install AD DS feature
+  ansible.windows.win_feature:
+    name:
+      - AD-Domain-Services
+      - RSAT-AD-Tools
+      - RSAT-ADDS-Tools
+      - RSAT-AD-PowerShell
+    state: present
+    include_management_tools: true
+  register: ad_feature
+
+- name: Reboot if required after feature install
+  ansible.windows.win_reboot:
+    reboot_timeout: 600
+  when: ad_feature.reboot_required
+
+- name: Check if domain already exists
+  ansible.windows.win_powershell:
+    script: |
+      try {
+        Get-ADDomain -ErrorAction Stop
+        $Ansible.Result = "exists"
+      } catch {
+        $Ansible.Result = "not_found"
+      }
+  register: domain_check
+  ignore_errors: true
+
+- name: Promote to Domain Controller (new forest)
+  ansible.windows.win_powershell:
+    script: |
+      Import-Module ADDSDeployment
+      $secpasswd = ConvertTo-SecureString '{{ safe_mode_password }}' -AsPlainText -Force
+
+      Install-ADDSForest `
+        -DomainName '{{ domain_name }}' `
+        -DomainNetbiosName '{{ domain_netbios }}' `
+        -SafeModeAdministratorPassword $secpasswd `
+        -InstallDns:$true `
+        -DatabasePath 'C:\Windows\NTDS' `
+        -LogPath 'C:\Windows\NTDS' `
+        -SysvolPath 'C:\Windows\SYSVOL' `
+        -NoRebootOnCompletion:$false `
+        -Force:$true
+  when: domain_check.result is defined and domain_check.result == "not_found"
+  register: promote_result
+
+- name: Wait for reboot after promotion
+  ansible.windows.win_reboot:
+    reboot_timeout: 900
+    post_reboot_delay: 60
+  when: promote_result is changed
+
+- name: Wait for AD services to stabilize
+  ansible.windows.win_powershell:
+    script: |
+      $maxRetries = 30
+      $retry = 0
+      while ($retry -lt $maxRetries) {
+        try {
+          Get-ADDomain -ErrorAction Stop | Out-Null
+          $Ansible.Result = "ready"
+          break
+        } catch {
+          Start-Sleep -Seconds 10
+          $retry++
+        }
+      }
+      if ($retry -ge $maxRetries) { $Ansible.Result = "timeout" }
+  register: ad_ready
+  until: ad_ready.result == "ready"
+  retries: 5
+  delay: 30
+
+- name: Configure DNS forwarder
+  ansible.windows.win_powershell:
+    script: |
+      Set-DnsServerForwarder -IPAddress '{{ dns_forwarder }}' -PassThru
+  when: dns_forwarder is defined
+
+- name: Create default OUs
+  ansible.windows.win_powershell:
+    script: |
+      $domain = (Get-ADDomain).DistinguishedName
+      $ous = @('Servers', 'Workstations', 'Users', 'Groups', 'Service Accounts')
+      foreach ($ou in $ous) {
+        $path = "OU=$ou,$domain"
+        if (-not (Get-ADOrganizationalUnit -Filter "Name -eq '$ou'" -SearchBase $domain -ErrorAction SilentlyContinue)) {
+          New-ADOrganizationalUnit -Name $ou -Path $domain -ProtectedFromAccidentalDeletion $true
+          Write-Output "Created OU: $ou"
+        }
+      }

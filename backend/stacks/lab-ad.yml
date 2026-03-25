@@ -1,0 +1,89 @@
+slug: lab-ad
+name: "Lab Active Directory"
+description: >
+  Environnement Active Directory complet avec contrôleur de domaine,
+  autorité de certification (PKI), serveur DHCP et serveur membre.
+  Idéal pour les labs cybersécurité et l'apprentissage Windows Server.
+category: windows
+icon: shield-check
+version: "1.0.0"
+
+services:
+  - id: ad-ds
+    name: "Active Directory Domain Services"
+    description: "Contrôleur de domaine, DNS intégré, GPO"
+    required: true
+    roles: [ad-ds, dns]
+
+  - id: ad-cs
+    name: "Active Directory Certificate Services"
+    description: "PKI d'entreprise, templates de certificats, auto-enrollment"
+    required: false
+    depends_on: [ad-ds]
+    roles: [ad-cs]
+
+  - id: dhcp
+    name: "Serveur DHCP"
+    description: "Attribution automatique d'adresses IP"
+    required: false
+    depends_on: [ad-ds]
+    roles: [dhcp]
+
+  - id: file-server
+    name: "Serveur de fichiers"
+    description: "Partages réseau, DFS, quotas"
+    required: false
+    depends_on: [ad-ds]
+    roles: [file-server]
+
+  - id: iis
+    name: "Serveur Web IIS"
+    description: "IIS avec certificat PKI"
+    required: false
+    depends_on: [ad-ds]
+    roles: [iis]
+
+  - id: member-workstation
+    name: "Poste client Windows"
+    description: "Windows 10/11 joint au domaine pour tester les GPO"
+    required: false
+    depends_on: [ad-ds]
+    roles: [domain-join]
+
+vms:
+  - name: DC01
+    template: win2022-tpl
+    os_type: windows
+    roles: [ad-ds, dns, dhcp]
+    default_specs: { cores: 2, ram: 4096, disk: 60 }
+    depends_on: []
+
+  - name: CA01
+    template: win2022-tpl
+    os_type: windows
+    roles: [ad-cs]
+    default_specs: { cores: 2, ram: 2048, disk: 40 }
+    depends_on: [DC01]
+
+  - name: SRV01
+    template: win2022-tpl
+    os_type: windows
+    roles: [file-server, iis]
+    default_specs: { cores: 2, ram: 2048, disk: 80 }
+    depends_on: [DC01]
+
+  - name: PC01
+    template: win11-tpl
+    os_type: windows
+    roles: [domain-join]
+    default_specs: { cores: 2, ram: 4096, disk: 60 }
+    depends_on: [DC01]
+
+default_vars:
+  domain_name: lab.local
+  domain_netbios: LAB
+  safe_mode_password: "P@ssw0rd!Lab2025"
+  ca_common_name: "LAB-CA01-CA"
+  dhcp_scope_start: "10.0.1.100"
+  dhcp_scope_end: "10.0.1.200"
+  dns_forwarder: "1.1.1.1"
