@@ -191,15 +191,19 @@ def deploy_stack_task(self, deployment_id: str):
             phase="provisioning",
         )
 
-        # ── Step 3 & 4: Validate templates, clone and configure each VM ──
-        # Pre-validate all templates before starting to avoid partial deployments
+        # ── Step 3 & 4: Validate images/templates and create VMs ──
+        # Pre-validate: check cloud images are known or templates exist
         for vm_def in needed_vms:
-            tpl = proxmox_service.find_template_vmid(vm_def["template"])
-            if tpl is None:
-                raise Exception(
-                    f"Template '{vm_def['template']}' introuvable sur Proxmox. "
-                    f"Créez le template avant de lancer le déploiement."
-                )
+            tpl_name = vm_def["template"]
+            if not proxmox_service.is_cloud_image(tpl_name):
+                # Fallback: check for a Proxmox template
+                tpl = proxmox_service.find_template_vmid(tpl_name)
+                if tpl is None:
+                    raise Exception(
+                        f"Image '{tpl_name}' non supportée et aucun template "
+                        f"Proxmox trouvé. Images disponibles : "
+                        f"{', '.join(proxmox_service.list_cloud_images())}"
+                    )
 
         # Validate all roles exist before starting
         missing_roles = []
@@ -212,41 +216,84 @@ def deploy_stack_task(self, deployment_id: str):
                 f"Rôles Ansible manquants : {', '.join(sorted(set(missing_roles)))}"
             )
 
+        # Read SSH public key for cloud-init injection
+        ssh_pub_key = None
+        try:
+            key_path = settings.ansible_private_key
+            if key_path.startswith("~"):
+                import os
+                key_path = os.path.expanduser(key_path)
+            pub_path = key_path + ".pub"
+            with open(pub_path, "r") as f:
+                ssh_pub_key = f.read().strip()
+            _log(db, deployment_id, f"Clé SSH chargée: {pub_path}", phase="init")
+        except FileNotFoundError:
+            _log(db, deployment_id,
+                 "Aucune clé SSH publique trouvée, cloud-init sans clé SSH",
+                 level="warn", phase="init")
+
         vm_records = []
         for vm_def in needed_vms:
-            vm_name = f"{deployment.name}-{vm_def['name']}".lower().replace(" ", "-")
-
-            _log(db, deployment_id, f"Clonage de {vm_name}...", phase="provisioning")
-
-            template_vmid = proxmox_service.find_template_vmid(vm_def["template"])
+            import re
+            raw_name = f"{deployment.name}-{vm_def['name']}".lower()
+            vm_name = re.sub(r"[^a-z0-9\-]", "-", raw_name).strip("-")
+            vm_name = re.sub(r"-+", "-", vm_name)  # collapse multiple dashes
+            tpl_name = vm_def["template"]
             new_vmid = proxmox_service.get_next_vmid()
-            upid = proxmox_service.clone_template(
-                template_vmid=template_vmid,
-                new_vmid=new_vmid,
-                name=vm_name,
-            )
 
-            success = proxmox_service.wait_for_task(upid, timeout=300)
-            if not success:
-                raise Exception(f"Clone failed for {vm_name} (VMID {new_vmid})")
-
-            _log(db, deployment_id, f"VM {vm_name} clonée (VMID: {new_vmid})", phase="provisioning")
-
-            # Configure specs
             specs = vm_def.get("default_specs", {})
             overrides = (deployment.vm_specs_override or {}).get(vm_def["name"], {})
             specs.update(overrides)
 
-            # Resolve VLAN (int or None)
             raw_vlan = (deployment.network_config or {}).get("vlan_id") or settings.default_vlan_id
             vlan_tag = int(raw_vlan) if raw_vlan else None
 
-            proxmox_service.configure_vm(
-                vmid=new_vmid,
-                cores=specs.get("cores", 2),
-                memory=specs.get("ram", 4096),
-                vlan_tag=vlan_tag,
-            )
+            if proxmox_service.is_cloud_image(tpl_name):
+                # ── Cloud image path: create VM from scratch ──
+                _log(db, deployment_id,
+                     f"Création de {vm_name} depuis l'image cloud {tpl_name}...",
+                     phase="provisioning")
+
+                proxmox_service.create_vm_from_cloud_image(
+                    vmid=new_vmid,
+                    name=vm_name,
+                    template_name=tpl_name,
+                    cores=specs.get("cores", 2),
+                    memory=specs.get("ram", 4096),
+                    disk_size=specs.get("disk", 40),
+                    vlan_tag=vlan_tag,
+                    ssh_public_key=ssh_pub_key,
+                    ci_user=deployment.vm_user,
+                    ci_password=deployment.vm_password,
+                )
+
+                _log(db, deployment_id,
+                     f"VM {vm_name} créée (VMID: {new_vmid})",
+                     phase="provisioning")
+            else:
+                # ── Legacy template clone path ──
+                _log(db, deployment_id, f"Clonage de {vm_name}...", phase="provisioning")
+
+                template_vmid = proxmox_service.find_template_vmid(tpl_name)
+                upid = proxmox_service.clone_template(
+                    template_vmid=template_vmid,
+                    new_vmid=new_vmid,
+                    name=vm_name,
+                )
+                success = proxmox_service.wait_for_task(upid, timeout=300)
+                if not success:
+                    raise Exception(f"Clone failed for {vm_name} (VMID {new_vmid})")
+
+                _log(db, deployment_id,
+                     f"VM {vm_name} clonée (VMID: {new_vmid})",
+                     phase="provisioning")
+
+                proxmox_service.configure_vm(
+                    vmid=new_vmid,
+                    cores=specs.get("cores", 2),
+                    memory=specs.get("ram", 4096),
+                    vlan_tag=vlan_tag,
+                )
 
             vm_record = DeployedVM(
                 deployment_id=deployment_id,

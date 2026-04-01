@@ -30,6 +30,7 @@ class ServiceInfo(BaseModel):
     description: str = ""
     required: bool = False  # If True, cannot be deselected
     depends_on: list[str] = []
+    roles: list[str] = []
 
 
 class VMTemplate(BaseModel):
@@ -80,6 +81,8 @@ class DeployRequest(BaseModel):
     selected_services: list[str]  # Service IDs to activate
     vm_specs_override: dict | None = None  # {"DC01": {"ram": 8192}}
     network_config: dict | None = None  # {"vlan_id": 10, "subnet": "10.0.1.0/24"}
+    vm_user: str = Field(..., min_length=1)  # Login for cloud-init VMs
+    vm_password: str = Field(..., min_length=1)  # Password for cloud-init VMs
 
 
 class DeploymentOut(BaseModel):
@@ -112,6 +115,8 @@ class VMOut(BaseModel):
 
 class DeploymentDetailOut(DeploymentOut):
     vms: list[VMOut] = []
+    vm_user: str | None = None
+    vm_password: str | None = None
 
 
 class LogEntry(BaseModel):

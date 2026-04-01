@@ -23,4 +23,4 @@ celery_app.conf.update(
     result_expires=3600 * 24,  # Results expire after 24h
 )
 
-celery_app.autodiscover_tasks(["app.services"])
+celery_app.autodiscover_tasks(["app.services"], related_name="deployer")

@@ -6,7 +6,7 @@ import { useDeploymentsStore } from '@/stores/deployments'
 import StatusBadge from '@/components/StatusBadge.vue'
 import {
   ArrowLeft, Rocket, Check, Lock, Info, Cpu, MemoryStick,
-  HardDrive, Network, ChevronDown, ChevronUp
+  HardDrive, Network, ChevronDown, ChevronUp, Pencil
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -24,6 +24,9 @@ const success = ref('')
 
 // VM spec overrides
 const vmOverrides = ref({})
+const editingVM = ref(null)
+const vmUser = ref('root')
+const vmPassword = ref('')
 
 onMounted(async () => {
   const data = await stackStore.fetchStack(route.params.slug)
@@ -69,13 +72,34 @@ const activeVMs = computed(() => {
   )
 })
 
+function getSpecs(vm) {
+  const defaults = vm.default_specs || {}
+  const overrides = vmOverrides.value[vm.name] || {}
+  return {
+    cores: overrides.cores ?? defaults.cores ?? 2,
+    ram: overrides.ram ?? defaults.ram ?? 2048,
+    disk: overrides.disk ?? defaults.disk ?? 40,
+  }
+}
+
+function toggleEdit(vm) {
+  if (editingVM.value === vm.name) {
+    editingVM.value = null
+  } else {
+    editingVM.value = vm.name
+    if (!vmOverrides.value[vm.name]) {
+      vmOverrides.value[vm.name] = { ...vm.default_specs }
+    }
+  }
+}
+
 const totalResources = computed(() => {
   return activeVMs.value.reduce((acc, vm) => {
-    const specs = vm.default_specs || {}
+    const specs = getSpecs(vm)
     return {
-      cores: acc.cores + (specs.cores || 0),
-      ram: acc.ram + (specs.ram || 0),
-      disk: acc.disk + (specs.disk || 0),
+      cores: acc.cores + specs.cores,
+      ram: acc.ram + specs.ram,
+      disk: acc.disk + specs.disk,
     }
   }, { cores: 0, ram: 0, disk: 0 })
 })
@@ -90,6 +114,8 @@ async function handleDeploy() {
       name: deployName.value,
       selected_services: [...selectedServices.value],
       vm_specs_override: Object.keys(vmOverrides.value).length ? vmOverrides.value : null,
+      vm_user: vmUser.value || null,
+      vm_password: vmPassword.value || null,
     })
     success.value = `Déploiement lancé ! ID: ${result.id}`
     setTimeout(() => router.push(`/deployments/${result.id}`), 1500)
@@ -172,25 +198,64 @@ async function handleDeploy() {
             <div
               v-for="vm in activeVMs"
               :key="vm.name"
-              class="flex items-center gap-4 p-3 rounded-lg bg-surface-800/40"
+              class="rounded-lg bg-surface-800/40 overflow-hidden"
             >
-              <div class="w-8 h-8 rounded bg-surface-700 flex items-center justify-center">
-                <Cpu class="w-4 h-4 text-surface-400" />
+              <div class="flex items-center gap-4 p-3 cursor-pointer" @click="toggleEdit(vm)">
+                <div class="w-8 h-8 rounded bg-surface-700 flex items-center justify-center">
+                  <Cpu class="w-4 h-4 text-surface-400" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-mono font-medium text-surface-200">{{ vm.name }}</div>
+                  <div class="text-xs text-surface-500">{{ vm.roles.join(', ') }}</div>
+                </div>
+                <div class="flex items-center gap-3 text-xs text-surface-500">
+                  <span class="flex items-center gap-1">
+                    <Cpu class="w-3 h-3" /> {{ getSpecs(vm).cores }}
+                  </span>
+                  <span class="flex items-center gap-1">
+                    <MemoryStick class="w-3 h-3" /> {{ (getSpecs(vm).ram / 1024).toFixed(0) }}G
+                  </span>
+                  <span class="flex items-center gap-1">
+                    <HardDrive class="w-3 h-3" /> {{ getSpecs(vm).disk }}G
+                  </span>
+                </div>
+                <Pencil class="w-3.5 h-3.5 text-surface-600 shrink-0" />
               </div>
-              <div class="flex-1 min-w-0">
-                <div class="text-sm font-mono font-medium text-surface-200">{{ vm.name }}</div>
-                <div class="text-xs text-surface-500">{{ vm.roles.join(', ') }}</div>
-              </div>
-              <div class="flex items-center gap-3 text-xs text-surface-500">
-                <span class="flex items-center gap-1">
-                  <Cpu class="w-3 h-3" /> {{ vm.default_specs?.cores || 2 }}
-                </span>
-                <span class="flex items-center gap-1">
-                  <MemoryStick class="w-3 h-3" /> {{ ((vm.default_specs?.ram || 2048) / 1024).toFixed(0) }}G
-                </span>
-                <span class="flex items-center gap-1">
-                  <HardDrive class="w-3 h-3" /> {{ vm.default_specs?.disk || 40 }}G
-                </span>
+
+              <!-- Inline spec editor -->
+              <div v-if="editingVM === vm.name" class="px-4 pb-4 pt-1 border-t border-surface-700/50">
+                <div class="grid grid-cols-3 gap-3 mt-2">
+                  <div>
+                    <label class="block text-xs text-surface-500 mb-1">CPU (cores)</label>
+                    <input
+                      type="number" min="1" max="32"
+                      v-model.number="vmOverrides[vm.name].cores"
+                      class="input text-center"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-surface-500 mb-1">RAM (Mo)</label>
+                    <input
+                      type="number" min="512" step="512"
+                      v-model.number="vmOverrides[vm.name].ram"
+                      class="input text-center"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-surface-500 mb-1">Disque (Go)</label>
+                    <input
+                      type="number" min="10"
+                      v-model.number="vmOverrides[vm.name].disk"
+                      class="input text-center"
+                    />
+                  </div>
+                </div>
+                <button
+                  @click="delete vmOverrides[vm.name]; editingVM = null"
+                  class="text-xs text-surface-600 hover:text-surface-400 mt-2 transition-colors"
+                >
+                  Réinitialiser les valeurs par défaut
+                </button>
               </div>
             </div>
           </div>
@@ -239,25 +304,30 @@ async function handleDeploy() {
             <input v-model="deployName" class="input" />
           </div>
 
-          <!-- Advanced toggle -->
-          <button
-            @click="showAdvanced = !showAdvanced"
-            class="flex items-center gap-2 text-xs text-surface-500 hover:text-surface-300 transition-colors"
-          >
-            <component :is="showAdvanced ? ChevronUp : ChevronDown" class="w-3.5 h-3.5" />
-            Options avancées
-          </button>
-
-          <div v-if="showAdvanced" class="space-y-3 p-3 rounded-lg bg-surface-800/30 border border-surface-800">
+          <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs text-surface-500 mb-1">VLAN ID</label>
-              <input class="input" type="number" placeholder="Aucun" />
+              <label class="block text-xs text-surface-500 mb-1.5">Login VMs <span class="text-red-400">*</span></label>
+              <input
+                v-model="vmUser"
+                type="text"
+                class="input"
+                placeholder="root"
+                required
+              />
             </div>
             <div>
-              <label class="block text-xs text-surface-500 mb-1">Domaine</label>
-              <input class="input" value="lab.local" />
+              <label class="block text-xs text-surface-500 mb-1.5">Mot de passe VMs <span class="text-red-400">*</span></label>
+              <input
+                v-model="vmPassword"
+                type="password"
+                class="input"
+                placeholder="Mot de passe"
+                autocomplete="new-password"
+                required
+              />
             </div>
           </div>
+          <p class="text-xs text-surface-600 -mt-2">Identifiants console/SSH des VMs</p>
 
           <!-- Error / Success -->
           <div v-if="error" class="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
@@ -270,7 +340,7 @@ async function handleDeploy() {
           <!-- Deploy button -->
           <button
             @click="handleDeploy"
-            :disabled="deploying || activeVMs.length === 0"
+            :disabled="deploying || activeVMs.length === 0 || !vmUser || !vmPassword"
             class="btn-primary w-full"
           >
             <span v-if="deploying" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

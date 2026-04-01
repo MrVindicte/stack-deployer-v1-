@@ -6,8 +6,10 @@ import StatusBadge from '@/components/StatusBadge.vue'
 import {
   ArrowLeft, Cpu, MemoryStick, HardDrive, Network,
   Square, Trash2, RefreshCw, Clock, ScrollText,
-  CheckCircle2, AlertTriangle, XCircle, Info
+  CheckCircle2, AlertTriangle, XCircle, Info, Eye, EyeOff, Copy
 } from 'lucide-vue-next'
+
+const showPassword = ref(false)
 
 const route = useRoute()
 const router = useRouter()
@@ -138,6 +140,36 @@ async function handleRefresh() {
       <div class="card p-4">
         <p class="text-xs text-surface-500">VMs</p>
         <p class="text-sm text-surface-200 mt-1">{{ store.current.vms?.length || 0 }}</p>
+      </div>
+    </div>
+
+    <!-- VM Credentials -->
+    <div v-if="store.current.vm_user || store.current.vm_password" class="card p-4">
+      <p class="text-xs text-surface-500 mb-3">Identifiants des VMs</p>
+      <div class="flex items-center gap-6">
+        <div v-if="store.current.vm_user">
+          <p class="text-xs text-surface-600">Login</p>
+          <div class="flex items-center gap-2 mt-0.5">
+            <p class="text-sm font-mono text-surface-200">{{ store.current.vm_user }}</p>
+            <button @click="navigator.clipboard.writeText(store.current.vm_user)" class="btn-ghost btn-sm">
+              <Copy class="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+        <div v-if="store.current.vm_password">
+          <p class="text-xs text-surface-600">Mot de passe</p>
+          <div class="flex items-center gap-2 mt-0.5">
+            <p class="text-sm font-mono text-surface-200">
+              {{ showPassword ? store.current.vm_password : '••••••••••••' }}
+            </p>
+            <button @click="showPassword = !showPassword" class="btn-ghost btn-sm">
+              <component :is="showPassword ? EyeOff : Eye" class="w-3.5 h-3.5" />
+            </button>
+            <button @click="navigator.clipboard.writeText(store.current.vm_password)" class="btn-ghost btn-sm">
+              <Copy class="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 

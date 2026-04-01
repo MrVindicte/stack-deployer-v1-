@@ -19,7 +19,7 @@ from app.core.database import Base
 
 
 def utcnow():
-    return datetime.now(timezone.utc)
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def gen_uuid():
@@ -83,6 +83,8 @@ class Deployment(Base):
     selected_services = Column(JSON, nullable=False, default=list)
     vm_specs_override = Column(JSON, nullable=True)  # Optional per-VM overrides
     network_config = Column(JSON, nullable=True)
+    vm_user = Column(String(100), nullable=True)  # cloud-init user for VMs
+    vm_password = Column(String(255), nullable=True)  # cloud-init password for VMs
     celery_task_id = Column(String(255), nullable=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)

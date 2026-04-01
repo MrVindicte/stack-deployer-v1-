@@ -53,7 +53,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('sd_token')
+  const token = sessionStorage.getItem('sd_token')
   if (to.meta.auth && !token) return next('/login')
   if (to.meta.guest && token) return next('/')
   next()

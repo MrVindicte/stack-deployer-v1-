@@ -140,6 +140,8 @@ async def create_deployment(
         selected_services=body.selected_services,
         vm_specs_override=body.vm_specs_override,
         network_config=body.network_config,
+        vm_user=body.vm_user,
+        vm_password=body.vm_password,
         status="pending",
     )
     db.add(deployment)
@@ -228,6 +230,8 @@ async def get_deployment(
         started_at=deployment.started_at,
         completed_at=deployment.completed_at,
         error_message=deployment.error_message,
+        vm_user=deployment.vm_user,
+        vm_password=deployment.vm_password,
         vms=[
             VMOut(
                 id=vm.id,
